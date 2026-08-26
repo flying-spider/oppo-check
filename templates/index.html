@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>OPPO 账号查询工具</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1a2e;color:#eee;min-height:100vh;overflow:hidden}
+.header{background:#16213e;padding:10px 16px;border-bottom:2px solid #0f3460}
+.header h1{font-size:18px;color:#e94560;margin-bottom:6px}
+.settings{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+.settings label{font-size:12px;color:#aaa;white-space:nowrap}
+.settings input[type="number"]{width:55px;padding:4px 6px;border:1px solid #0f3460;border-radius:4px;background:#1a1a2e;color:#eee;text-align:center;font-size:13px}
+.settings input[type="text"]{padding:4px 8px;border:1px solid #0f3460;border-radius:4px;background:#1a1a2e;color:#eee;font-size:12px}
+#targetNick,#targetAccount{width:105px}
+#targetYear{width:55px}
+.main{display:flex;height:calc(100vh - 145px)}
+.left{width:270px;border-right:1px solid #0f3460;display:flex;flex-direction:column;padding:10px;min-width:200px}
+.left textarea{flex:1;background:#1a1a2e;border:1px solid #0f3460;border-radius:6px;color:#ccc;padding:8px;font-family:monospace;font-size:12px;resize:none}
+.left .hint{color:#666;font-size:11px;margin-top:4px}
+.left-stats{background:#16213e;padding:6px 8px;border-radius:4px;font-size:11px;color:#aaa;margin-top:5px}
+.right{flex:1;display:flex;flex-direction:column;min-width:0}
+.table-wrap{flex:1;overflow:auto;padding:8px}
+table{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
+th{position:sticky;top:0;background:#16213e;color:#e94560;padding:6px 6px;text-align:left;font-weight:600;z-index:1;font-size:11px}
+th:nth-child(1){width:120px} th:nth-child(2){width:60px} th:nth-child(3){width:90px}
+th:nth-child(4){width:130px} th:nth-child(5){width:90px} th:nth-child(6){width:55px}
+th:nth-child(7){width:auto} th:nth-child(8){width:45px}
+td{padding:4px 6px;border-bottom:1px solid #0f3460;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+tr:hover{background:rgba(233,69,96,.05)}
+tr.hit{background:rgba(233,69,96,.25)!important}
+tr.row-reg{background:rgba(76,175,80,.05)}
+tr.hit.row-reg{background:rgba(76,175,80,.3)!important}
+.reg{color:#4caf50;font-weight:600}.unreg{color:#f44336}.captcha{color:#ff9800}.err{color:#888}
+.placeholder{text-align:center;color:#555;padding:60px 20px;font-size:14px}
+.footer{background:#16213e;padding:8px 16px;display:flex;align-items:center;gap:12px;border-top:2px solid #0f3460}
+.footer .status{flex:1;font-size:12px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.progress{width:160px;height:6px;background:#1a1a2e;border-radius:3px;overflow:hidden}
+.progress-bar{height:100%;background:#e94560;transition:width .3s;width:0%}
+button{padding:5px 12px;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;transition:opacity .2s}
+button:hover{opacity:.85}
+.btn-start{background:#4caf50;color:#fff}
+.btn-stop{background:#f44336;color:#fff}
+.btn-import{background:#0f3460;color:#eee}
+.btn-export{background:#e94560;color:#fff}
+.btn-clear{background:#333;color:#ccc}
+.btn-arrange{background:#0f3460;color:#8ecae6}
+button:disabled{opacity:.4;cursor:not-allowed}
+.badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600}
+.badge-reg{background:rgba(76,175,80,.2);color:#4caf50}
+.badge-unreg{background:rgba(244,67,54,.2);color:#f44336}
+.badge-cap{background:rgba(255,152,0,.2);color:#ff9800}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>&#128269; OPPO 账号查询工具</h1>
+  <div class="settings">
+    <label>并发窗口</label>
+    <input type="number" id="concurrency" value="3" min="1" max="15">
+    <label style="color:#e94560"><input type="checkbox" id="headlessMode"> 无头模式(⚠️易被风控)</label>
+    <label style="color:#8ecae6">IP池 API</label>
+    <input type="text" id="ipPoolApi" placeholder="10条/秒代理API URL" title="每秒返回10条代理的API地址">
+    <label style="color:#8ecae6">延迟阈值(ms)</label>
+    <input type="number" id="ipThreshold" value="2000" min="200" max="10000" step="100" title="HTTP HEAD 延迟低于此值才入池">
+    <label>&#127919;目标昵称</label>
+    <input type="text" id="targetNick" placeholder="如: a***6" title="脱敏昵称">
+    <label>&#127919;目标账号</label>
+    <input type="text" id="targetAccount" placeholder="如: 166******32" title="脱敏手机号">
+    <label>&#127919;目标年份</label>
+    <input type="text" id="targetYear" placeholder="如: 2025" title="注册年份">
+    <input type="file" id="fileInput" accept=".txt,.csv" style="display:none" onchange="importFile()">
+    <button class="btn-import" onclick="document.getElementById('fileInput').click()">&#128194; 导入</button>
+    <input type="number" id="genCount" value="50" min="1" max="2000" style="width:50px" title="生成数量">
+    <button class="btn-import" onclick="generatePhones()">&#127922; 生成随机</button>
+    <button class="btn-start" id="startBtn" onclick="startQuery()">&#9654; 开始</button>
+    <button class="btn-stop" id="stopBtn" onclick="stopQuery()" disabled>&#9209; 停止</button>
+    <button class="btn-export" id="exportBtn" onclick="exportCSV()" disabled>&#128229; 导出</button>
+    <button class="btn-clear" onclick="clearAll()">&#128465; 清空</button>
+    <button class="btn-arrange" onclick="arrangeWindows()">&#129518; 窗口排序</button>
+    <label style="color:#8ecae6;font-size:12px;cursor:pointer;user-select:none">
+      <input type="checkbox" id="autoArrange" onchange="saveConfig()"> 自动排序
+    </label>
+  </div>
+</div>
+<div class="main">
+  <div class="left">
+    <textarea id="phoneInput" placeholder="每行一个手机号，或用「导入」选取文件...">{{ pending_phones | join("\n") }}</textarea>
+    <div class="hint" id="phoneHint">输入手机号或导入文件</div>
+    <div class="left-stats">
+      <div>&#9989; 已注册: <span id="statReg" style="color:#4caf50;font-weight:700">0</span></div>
+      <div>&#10060; 未注册: <span id="statUnreg" style="color:#f44336;font-weight:700">0</span></div>
+      <div>&#9888; 风控: <span id="statCap" style="color:#ff9800;font-weight:700">0</span></div>
+      <div>&#9203; 其他: <span id="statOther" style="color:#888;font-weight:700">0</span></div>
+      <div style="margin-top:4px;padding-top:4px;border-top:1px solid #0f3460">
+        <span style="color:#8ecae6">&#9830; IP池</span>
+        <span id="poolStatus" style="color:#aaa;font-size:10px">就绪</span>
+      </div>
+    </div>
+  </div>
+  <div class="right">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>手机号</th><th>状态</th><th>昵称</th><th>账号(脱敏)</th><th>注册时间</th><th>耗时</th><th>代理</th><th>重试</th></tr>
+        </thead>
+        <tbody id="resultBody">
+          <tr><td colspan="8" class="placeholder">导入手机号后点击「开始查询」</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="footer">
+  <div class="status" id="statusText">就绪</div>
+  <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+  <div style="font-size:11px;color:#888" id="statsText"></div>
+</div>
+
+<script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+<script>
+var socket = io();
+var total = 0, done = 0, firstResult = true, phones = [];
+
+socket.on("result", function(r){
+  done = r.done;
+  var pct = Math.round(done/r.total_pending*100);
+  document.getElementById("progressBar").style.width = pct+"%";
+  updateStats();
+
+  if (firstResult) { document.getElementById("resultBody").innerHTML = ""; firstResult = false; document.getElementById("exportBtn").disabled = false; }
+
+  var st, stCls;
+  if (r.registered === true)          { st = '已注册'; stCls = 'reg'; }
+  else if (r.registered === false)    { st = '未注册'; stCls = 'unreg'; }
+  else if (r.error)                   { st = r.error.slice(0,24); stCls = 'err'; }
+  else                                { st = '错误'; stCls = 'err'; }
+  var rowCls = r.registered===true?'row-reg':'';
+  var tm = (r.elapsed_ms/1000).toFixed(1)+'s';
+  var proxy = r.proxy||'直连';
+  var nick = r.nick_name||'';
+  var acct = r.account_name || r.masked || '';
+  var rtime = r.register_time||'';
+  var isHit = st==='已注册' && (nick||acct||rtime);
+
+  var row = document.createElement('tr');
+  row.className = isHit ? 'hit ' + rowCls : rowCls;
+  row.innerHTML =
+    '<td>'+r.phone+'</td>'+
+    '<td class="'+stCls+'">'+st+'</td>'+
+    '<td>'+nick+'</td>'+
+    '<td>'+acct+'</td>'+
+    '<td>'+rtime+'</td>'+
+    '<td>'+tm+'</td>'+
+    '<td style="font-size:10px" title="'+r.proxy+'">'+proxy+'</td>'+
+    '<td>'+r.retries+'</td>';
+
+  // 最新结果插入到最前面 (从下往上)
+  var tbody = document.getElementById("resultBody");
+  tbody.insertBefore(row, tbody.firstChild);
+
+  document.getElementById("statsText").textContent =
+    "已完成: "+done+"/"+r.total_pending;
+});
+
+socket.on("status", function(s){
+  document.getElementById("statusText").textContent =
+    "["+(s.worker>=0?"W"+s.worker:"")+"] "+s.msg;
+});
+
+socket.on("complete", function(c){
+  document.getElementById("startBtn").disabled = false;
+  document.getElementById("stopBtn").disabled = true;
+  document.getElementById("exportBtn").disabled = false;
+  document.getElementById("statusText").textContent =
+    "查询完成: "+(c.registered||0)+" 已注册, "+(c.unregistered||0)+" 未注册";
+  updateStats();
+});
+
+socket.on("error", function(e){
+  document.getElementById("startBtn").disabled = false;
+  document.getElementById("stopBtn").disabled = true;
+  document.getElementById("statusText").textContent = "错误: " + e.msg;
+});
+
+socket.on("pool_status", function(s){
+  var el = document.getElementById("poolStatus");
+  if (el) {
+    el.textContent =
+      "活跃" + (s.active_workers||0) +
+      " 可用" + (s.size||0) + " 已用" + (s.used||0) +
+      " 已扫" + (s.tested||0) + " 待扫" + (s.pending||0);
+    el.style.color = s.size >= 3 ? "#4caf50" : (s.size > 0 ? "#ff9800" : "#888");
+  }
+});
+
+var statRegEl, statUnregEl, statCapEl, statOtherEl;
+function updateStats(){
+  if (!statRegEl) {
+    statRegEl = document.getElementById("statReg");
+    statUnregEl = document.getElementById("statUnreg");
+    statCapEl = document.getElementById("statCap");
+    statOtherEl = document.getElementById("statOther");
+  }
+  if (!statRegEl) return;
+  fetch("/api/export").then(r=>r.text()).then(function(t){
+    var lines = t.trim().split("\n");
+    var reg=0, unreg=0, cap=0, other=0;
+    for (var i=1; i<lines.length; i++) {
+      var cols = lines[i].split(",");
+      var s = cols[1]||'';
+      if (s==='已注册') reg++;
+      else if (s==='未注册') unreg++;
+      else if (s.indexOf('风控')===0) cap++;
+      else other++;
+    }
+    statRegEl.textContent = reg;
+    statUnregEl.textContent = unreg;
+    statCapEl.textContent = cap;
+    statOtherEl.textContent = other;
+  }).catch(function(){});
+}
+
+function generatePhones(){
+  var count = parseInt(document.getElementById('genCount').value) || 50;
+  fetch('/api/generate_phones', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({count: count})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.error) { alert(d.error); return; }
+      phones = d.phones;
+      document.getElementById('phoneInput').value = d.phones.join("\n");
+      document.getElementById('phoneHint').textContent = '已生成 ' + d.count + ' 个随机号码';
+      document.getElementById('statusText').textContent = '已生成 ' + d.count + ' 个随机号码';
+    });
+}
+
+
+function importFile(){
+  var file = document.getElementById("fileInput").files[0];
+  if (!file) return;
+  var fd = new FormData();
+  fd.append("file", file);
+  fetch("/api/import", {method:"POST",body:fd})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.error) { alert(d.error); return; }
+      phones = d.phones;
+      document.getElementById("phoneInput").value = d.phones.join("\n");
+      document.getElementById("phoneHint").textContent = "已加载 " + d.count + " 个号码";
+      document.getElementById("statusText").textContent = "已导入 " + d.count + " 个号码";
+    });
+}
+
+function getPhones(){
+  var text = document.getElementById("phoneInput").value;
+  var list = [];
+  text.split("\n").forEach(function(line){
+    line = line.trim();
+    if (!line || line.startsWith("#")) return;
+    line.replace(/\t/g,",").split(",").forEach(function(p){
+      p = p.trim().replace(/["']/g,"");
+      if (/^\d{10,}$/.test(p) && list.indexOf(p) < 0) list.push(p);
+    });
+  });
+  return list;
+}
+
+function startQuery(){
+  saveConfig();
+  var list = getPhones();
+  if (list.length === 0) { alert("请先输入或导入手机号"); return; }
+  phones = list;
+  total = list.length;
+  firstResult = true;
+  document.getElementById("resultBody").innerHTML =
+    '<tr><td colspan="8" class="placeholder">查询中...</td></tr>';
+  document.getElementById("startBtn").disabled = true;
+  document.getElementById("stopBtn").disabled = false;
+  document.getElementById("progressBar").style.width = "0%";
+  document.getElementById("phoneHint").textContent = list.length + " 个号码待查询";
+
+  fetch("/api/start", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      phones: list,
+      concurrency: parseInt(document.getElementById("concurrency").value) || 3,
+      headless: document.getElementById("headlessMode").checked,
+      target_nick: document.getElementById("targetNick").value,
+      target_account: document.getElementById("targetAccount").value,
+      target_year: document.getElementById("targetYear").value,
+      ip_pool_api: document.getElementById("ipPoolApi").value,
+      ip_threshold_ms: parseInt(document.getElementById("ipThreshold").value) || 2000,
+    })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.error) alert(d.error);
+    else {
+      document.getElementById("statusText").textContent = d.message;
+      // 自动排序：等 workers 启动后（延迟 3s）排列窗口
+      if (document.getElementById("autoArrange").checked) {
+        setTimeout(arrangeWindows, 3000);
+      }
+    }
+  });
+}
+
+function stopQuery(){
+  fetch("/api/stop", {method:"POST"}).then(function(){
+    document.getElementById("startBtn").disabled = false;
+    document.getElementById("stopBtn").disabled = true;
+    document.getElementById("statusText").textContent = "已停止";
+  });
+}
+
+function clearAll(){
+  document.getElementById("resultBody").innerHTML =
+    '<tr><td colspan="8" class="placeholder">导入手机号后点击「开始查询」</td></tr>';
+  document.getElementById("progressBar").style.width = "0%";
+  document.getElementById("statsText").textContent = "";
+  document.getElementById("statusText").textContent = "就绪";
+  document.getElementById("exportBtn").disabled = true;
+  ['statReg','statUnreg','statCap','statOther'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.textContent='0';
+  });
+  firstResult = true;
+}
+
+function exportCSV(){
+  window.open("/api/export", "_blank");
+}
+
+// ===== 多窗口自动排序 =====
+function arrangeWindows() {
+  var concurrency = parseInt(document.getElementById("concurrency").value) || 3;
+  var screenW = window.screen.availWidth || 1920;
+  var screenH = window.screen.availHeight || 1080;
+  fetch("/api/arrange", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      total_slots: concurrency,
+      screen_width: screenW,
+      screen_height: screenH,
+    })
+  }).then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.error) {
+        document.getElementById("statusText").textContent = "排序: " + d.error;
+      } else {
+        document.getElementById("statusText").textContent =
+          "已排列 " + d.arranged + "/" + d.total_slots + " 个窗口";
+      }
+    })
+    .catch(function(){
+      document.getElementById("statusText").textContent = "排序请求失败";
+    });
+}
+
+// ===== localStorage 持久化配置 =====
+function saveConfig() {
+  var cfg = {
+    concurrency: document.getElementById("concurrency").value,
+    headless: document.getElementById("headlessMode").checked,
+    targetNick: document.getElementById("targetNick").value,
+    targetAccount: document.getElementById("targetAccount").value,
+    targetYear: document.getElementById("targetYear").value,
+    autoArrange: document.getElementById("autoArrange").checked,
+    ipPoolApi: document.getElementById("ipPoolApi").value,
+    ipThreshold: document.getElementById("ipThreshold").value,
+  };
+  localStorage.setItem("oppo_query_config", JSON.stringify(cfg));
+}
+function loadConfig() {
+  try {
+    var saved = localStorage.getItem("oppo_query_config");
+    if (!saved) return;
+    var cfg = JSON.parse(saved);
+    if (cfg.concurrency) document.getElementById("concurrency").value = cfg.concurrency;
+    if (cfg.headless !== undefined) document.getElementById("headlessMode").checked = cfg.headless;
+    if (cfg.targetNick) document.getElementById("targetNick").value = cfg.targetNick;
+    if (cfg.targetAccount) document.getElementById("targetAccount").value = cfg.targetAccount;
+    if (cfg.targetYear) document.getElementById("targetYear").value = cfg.targetYear;
+    if (cfg.autoArrange !== undefined) document.getElementById("autoArrange").checked = cfg.autoArrange;
+    if (cfg.ipPoolApi) document.getElementById("ipPoolApi").value = cfg.ipPoolApi;
+    if (cfg.ipThreshold) document.getElementById("ipThreshold").value = cfg.ipThreshold;
+  } catch(e) {}
+}
+// 配置变化时自动保存
+["concurrency","headlessMode","targetNick","targetAccount","targetYear","ipPoolApi","ipThreshold"].forEach(function(id){
+  var el = document.getElementById(id);
+  if (el) el.addEventListener("change", saveConfig);
+});
+// 页面加载时恢复配置，如果勾选了自动排序则尝试排列
+window.addEventListener("DOMContentLoaded", function(){
+  loadConfig();
+  // 延迟给 WebSocket 连接时间，检测是否正在查询
+  setTimeout(function(){
+    if (document.getElementById("autoArrange").checked) {
+      arrangeWindows();
+    }
+  }, 2000);
+});
+
+
+</script>
+</body>
+</html>
