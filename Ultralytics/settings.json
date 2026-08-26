@@ -1,0 +1,21 @@
+{
+  "settings_version": "0.0.6",
+  "datasets_dir": "/Users/a1-6/Documents/OPPO\u7533\u8bc9/datasets",
+  "weights_dir": "/Users/a1-6/Documents/OPPO\u7533\u8bc9/weights",
+  "runs_dir": "/Users/a1-6/Documents/OPPO\u7533\u8bc9/runs",
+  "uuid": "bcf7ca7d1a11ae35b1ddf99c8e4924db22132bd6159a69c3cbb5adb6046e6d29",
+  "sync": true,
+  "api_key": "",
+  "openai_api_key": "",
+  "clearml": true,
+  "comet": true,
+  "dvc": true,
+  "hub": true,
+  "mlflow": true,
+  "neptune": true,
+  "raytune": true,
+  "tensorboard": false,
+  "wandb": false,
+  "vscode_msg": true,
+  "openvino_msg": true
+}
